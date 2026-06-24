@@ -1,0 +1,28 @@
+project_title: a-raft-core
+version: "0.1.4"
+description: "A dynamically scaffolded c/cmake project"
+stack: c/cmake
+date_created: 2026-04-26
+
+profile: default
+
+# ── 1. Scaffolding Engine Source ──
+base_templates:
+  repo: https://github.com/contactandyc/scaffold-templates.git
+  ref: main
+
+# ── Dynamic Setup Variables ──
+c_standard: "23"
+cxx_standard: "17"
+
+# ── 3. Licenses & Legal ──
+# license_profile: apache-2.0
+# license_overrides:
+#   "src/vendor/**": mit
+
+# ── 4. Dependencies ──
+depends_on:
+  - common/libuv
+  # - https://github.com/contactandyc/a-write-ahead-log.git
+  - https://github.com/contactandyc/h2o-c-library.git
+  - https://github.com/contactandyc/the-lz4-library.git
