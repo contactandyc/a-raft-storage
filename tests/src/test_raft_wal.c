@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include "a-raft-library/raft_wal.h"
+#include "a-raft-storage/raft_wal.h" // STRICT ISOLATION INCLUDE
 #include "the-macro-library/macro_test.h"
 
 #define TEST_WAL_DIR "wal_test_data"
@@ -98,7 +98,6 @@ MACRO_TEST(wal_detects_crc_corruption_in_old_sealed_segment_as_fatal) {
     raft_wal_append(&wal, 1, 1, 0, 0, 0, big, 400000);
     raft_wal_append(&wal, 1, 2, 0, 0, 0, big, 400000);
 
-    // FIX: Add a third 400KB append to exceed the 1MB segment limit!
     // This forces the WAL to rotate, permanently sealing Segment 1.
     raft_wal_append(&wal, 1, 3, 0, 0, 0, big, 400000);
 
@@ -157,6 +156,7 @@ MACRO_TEST(wal_append_rejects_payload_over_wal_max_payload_size) {
     raft_wal_t wal;
     MACRO_ASSERT_EQ_INT(raft_wal_init(&wal, TEST_WAL_DIR, 20, 0), 0);
     uint8_t dummy = 0;
+    // Attempting to append 15MB when internal WAL_V2_MAX_PAYLOAD_SIZE is 8MB
     MACRO_ASSERT_EQ_INT(raft_wal_append(&wal, 1, 1, 0, 0, 0, &dummy, 15 * 1024 * 1024), -1);
     raft_wal_close(&wal);
 }
@@ -289,12 +289,32 @@ MACRO_TEST(wal_rejects_segment_size_over_uint32_offset_limit) {
     MACRO_ASSERT_EQ_INT(raft_wal_init(&wal, TEST_WAL_DIR, 5000, 0), -1);
 }
 
+MACRO_TEST(raft_wal_offset_base_advances_after_purge) {
+    clear_test_dir();
+    raft_wal_t wal;
+    raft_wal_init(&wal, TEST_WAL_DIR, 1, 0);
+
+    uint8_t* big = calloc(1, 400000); // 400KB
+    raft_wal_append(&wal, 1, 1, 0, 0, 0, big, 400000); // Seg 1
+    raft_wal_append(&wal, 1, 2, 0, 0, 0, big, 400000); // Seg 1 (Total: ~800k)
+    raft_wal_append(&wal, 1, 3, 0, 0, 0, big, 400000); // Seg 2 (Total: ~1.2MB, triggers rotation)
+    raft_wal_flush_batch(&wal);
+    free(big);
+
+    uint64_t original_base = wal.offset_base_index;
+    raft_wal_purge_head(&wal, 2); // Safely purges segment 1
+
+    MACRO_ASSERT_TRUE(wal.offset_base_index > original_base);
+    MACRO_ASSERT_EQ_INT(wal.offset_base_index, 3);
+    raft_wal_close(&wal);
+}
+
 MACRO_TEST(raft_wal_offset_map_shrinks_after_purge) {
     clear_test_dir();
     raft_wal_t wal;
     raft_wal_init(&wal, TEST_WAL_DIR, 1, 0);
 
-    // FIX: Use a 500-byte payload so 5,000 entries = ~2.5MB.
+    // Use a 500-byte payload so 5,000 entries = ~2.5MB.
     // This forces the WAL to rotate through 3 physical segment files.
     uint8_t dummy[500] = {0};
     for (int i=1; i<=5000; i++) {

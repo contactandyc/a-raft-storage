@@ -31,6 +31,9 @@ RUN apt-get update && apt-get install -y \
     gdb \
     libtool \
     perl \
+    python3 \
+    python3-pip \
+    python3-venv \
     valgrind \
  && rm -rf /var/lib/apt/lists/*
 
@@ -55,6 +58,11 @@ RUN useradd --create-home --shell /bin/bash dev && \
 USER dev
 WORKDIR /workspace
 
+# --- Optional Python venv for tools ------------------------------------------
+RUN sudo python3 -m venv /opt/venv && \
+    sudo chown -R dev:dev /opt/venv && \
+    /opt/venv/bin/pip install --upgrade pip
+ENV PATH="/opt/venv/bin:${PATH}"
 
 # --- Build & install libuv ---
 RUN set -eux; \

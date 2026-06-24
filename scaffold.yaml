@@ -1,4 +1,4 @@
-project_title: a-raft-core
+project_title: a-raft-storage
 version: "0.1.4"
 description: "A dynamically scaffolded c/cmake project"
 stack: c/cmake

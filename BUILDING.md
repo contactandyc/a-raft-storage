@@ -35,7 +35,7 @@ sudo apt-get update && sudo apt-get install -y libssl-dev zlib1g-dev
 ### Development tooling (optional)
 
 ```bash
-sudo apt-get update && sudo apt-get install -y autoconf automake gdb libtool perl valgrind
+sudo apt-get update && sudo apt-get install -y autoconf automake gdb libtool perl python3 python3-pip python3-venv valgrind
 ```
 
 
