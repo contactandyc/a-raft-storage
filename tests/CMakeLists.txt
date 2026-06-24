@@ -6,7 +6,7 @@
 # CMakeLists.txt for tests
 cmake_minimum_required(VERSION 3.20)
 
-project(a_raft_core_tests LANGUAGES C)
+project(a_raft_storage_tests LANGUAGES C)
 
 if(CMAKE_PREFIX_PATH)
   include_directories("${CMAKE_PREFIX_PATH}/include")
@@ -14,7 +14,7 @@ if(CMAKE_PREFIX_PATH)
 endif()
 
 set(A_BUILD_VARIANT "debug" CACHE STRING
-    "Variant to link via a_raft_core::a_raft_core (debug|memory|static|shared)")
+    "Variant to link via a_raft_storage::a_raft_storage (debug|memory|static|shared)")
 set_property(CACHE A_BUILD_VARIANT PROPERTY STRINGS debug memory static shared)
 
 option(A_ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
@@ -41,8 +41,8 @@ find_package(h2o_c_library CONFIG REQUIRED)
 find_package(the_lz4_library CONFIG REQUIRED)
 
 # Fallback for standalone test builds (when not included via add_subdirectory)
-if(NOT TARGET a_raft_core::a_raft_core)
-  find_package(a_raft_core CONFIG REQUIRED)
+if(NOT TARGET a_raft_storage::a_raft_storage)
+  find_package(a_raft_storage CONFIG REQUIRED)
 endif()
 
 set(TEST_EXECUTABLES "")
@@ -73,7 +73,7 @@ set_target_properties(test_raft_wal PROPERTIES
 target_link_libraries(test_raft_wal PRIVATE libuv::uv)
 target_link_libraries(test_raft_wal PRIVATE h2o_c_library::h2o_c_library)
 target_link_libraries(test_raft_wal PRIVATE the_lz4_library::the_lz4_library)
-target_link_libraries(test_raft_wal PRIVATE a_raft_core::a_raft_core)
+target_link_libraries(test_raft_wal PRIVATE a_raft_storage::a_raft_storage)
 
 if(M_LIB)
   target_link_libraries(test_raft_wal PRIVATE ${M_LIB})
@@ -127,7 +127,7 @@ if(A_ENABLE_COVERAGE AND CMAKE_C_COMPILER_ID MATCHES "Clang")
     # Normal compiled library path
     add_custom_command(TARGET coverage_report POST_BUILD
       COMMAND ${LLVM_COV_EXECUTABLE} show
-              ../liba_raft_core_${A_BUILD_VARIANT}.a
+              ../liba_raft_storage_${A_BUILD_VARIANT}.a
               -instr-profile=default.profdata
               -format=html -output-dir=coverage_html
               --ignore-filename-regex='/usr/.*'
