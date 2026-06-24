@@ -1,7 +1,7 @@
 # BUILDING
 
-This project: **a-raft-core**
-Version: **0.1.4**
+This project: **a-raft-storage**
+Version: **0.1.5**
 
 ## Local build
 
