@@ -1,5 +1,5 @@
 project_title: a-raft-storage
-version: "0.1.4"
+version: "0.1.5"
 description: "A dynamically scaffolded c/cmake project"
 stack: c/cmake
 date_created: 2026-04-26
