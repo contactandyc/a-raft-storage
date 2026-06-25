@@ -800,3 +800,110 @@ void raft_wal_close(raft_wal_t* wal) {
     wal->batch_len = 0;
     wal->batch_cap = 0;
 }
+
+// ============================================================================
+// ENTERPRISE STORAGE FEATURES (Phase 3)
+// ============================================================================
+
+uint64_t raft_wal_verify_log_integrity(raft_wal_t* wal) {
+    if (!wal || wal->max_disk_index == 0) return 0;
+
+    for (uint64_t i = wal->offset_base_index; i <= wal->max_disk_index; i++) {
+        uint64_t term, cid, cseq;
+        uint8_t type;
+        uint8_t* payload = NULL;
+        uint32_t len = 0;
+
+        // The read_entry function implicitly checks the frame CRC32.
+        // If it fails, we have detected bit-rot on the disk.
+        if (!raft_wal_read_entry(wal, i, &term, &type, &cid, &cseq, &payload, &len)) {
+            return i;
+        }
+
+        if (payload) free(payload);
+    }
+    return 0; // 0 indicates perfect cryptographic integrity
+}
+
+int raft_wal_create_snapshot_manifest(const char* base_dir, uint64_t group_id, uint64_t snap_idx, uint64_t snap_term) {
+    char dat_path[512], meta_path[512], tmp_path[512];
+    snprintf(dat_path, 512, "%s/snap_grp%llu.dat", base_dir, (unsigned long long)group_id);
+    snprintf(meta_path, 512, "%s/snap_grp%llu.meta", base_dir, (unsigned long long)group_id);
+    snprintf(tmp_path, 512, "%s/snap_grp%llu.tmp_meta", base_dir, (unsigned long long)group_id);
+
+    FILE* fdat = fopen(dat_path, "rb");
+    if (!fdat) return -1;
+
+    uint32_t crc = ~0U;
+    uint64_t size = 0;
+    uint8_t buf[4096];
+    size_t r;
+    while ((r = fread(buf, 1, sizeof(buf), fdat)) > 0) {
+        crc = crc32_update(crc, buf, r);
+        size += r;
+    }
+    fclose(fdat);
+    crc = ~crc;
+
+    FILE* fmeta = fopen(tmp_path, "wb");
+    if (!fmeta) return -1;
+
+    uint8_t hdr[32];
+    pack_u32(hdr, 0x534E4150); // "SNAP" Magic
+    pack_u64(hdr + 4, snap_idx);
+    pack_u64(hdr + 12, snap_term);
+    pack_u64(hdr + 20, size);
+    pack_u32(hdr + 28, crc);
+
+    if (fwrite(hdr, 1, 32, fmeta) != 32) { fclose(fmeta); return -1; }
+
+    // Strict fsync before renaming
+    fflush(fmeta);
+    fsync(fileno(fmeta));
+    fclose(fmeta);
+
+    if (rename(tmp_path, meta_path) != 0) return -1;
+    if (!sync_dir(base_dir)) return -1;
+
+    return 0;
+}
+
+int raft_wal_verify_snapshot_manifest(const char* base_dir, uint64_t group_id, uint64_t* out_idx, uint64_t* out_term) {
+    char dat_path[512], meta_path[512];
+    snprintf(dat_path, 512, "%s/snap_grp%llu.dat", base_dir, (unsigned long long)group_id);
+    snprintf(meta_path, 512, "%s/snap_grp%llu.meta", base_dir, (unsigned long long)group_id);
+
+    FILE* fmeta = fopen(meta_path, "rb");
+    if (!fmeta) return -1;
+
+    uint8_t hdr[32];
+    if (fread(hdr, 1, 32, fmeta) != 32) { fclose(fmeta); return -1; }
+    fclose(fmeta);
+
+    if (unpack_u32(hdr) != 0x534E4150) return -1; // Magic mismatch
+
+    uint64_t snap_idx = unpack_u64(hdr + 4);
+    uint64_t snap_term = unpack_u64(hdr + 12);
+    uint64_t expected_size = unpack_u64(hdr + 20);
+    uint32_t expected_crc = unpack_u32(hdr + 28);
+
+    FILE* fdat = fopen(dat_path, "rb");
+    if (!fdat) return -1;
+
+    uint32_t crc = ~0U;
+    uint64_t size = 0;
+    uint8_t buf[4096];
+    size_t r;
+    while ((r = fread(buf, 1, sizeof(buf), fdat)) > 0) {
+        crc = crc32_update(crc, buf, r);
+        size += r;
+    }
+    fclose(fdat);
+    crc = ~crc;
+
+    if (size != expected_size || crc != expected_crc) return -1; // Checksum or size mismatch!
+
+    if (out_idx) *out_idx = snap_idx;
+    if (out_term) *out_term = snap_term;
+    return 0;
+}

@@ -65,4 +65,17 @@ int  raft_wal_truncate_tail(raft_wal_t* wal, uint64_t truncate_from_index);
 int  raft_wal_purge_head(raft_wal_t* wal, uint64_t safe_checkpoint_index);
 void raft_wal_close(raft_wal_t* wal);
 
+// ============================================================================
+// ENTERPRISE STORAGE FEATURES (Phase 3)
+// ============================================================================
+
+// Scans the active and sealed segments to detect bit-rot. Returns 0 if healthy, or the index of the first corrupted frame.
+uint64_t raft_wal_verify_log_integrity(raft_wal_t* wal);
+
+// Generates a `.meta` file containing a CRC32 checksum of the `.dat` snapshot file
+int raft_wal_create_snapshot_manifest(const char* base_dir, uint64_t group_id, uint64_t snap_idx, uint64_t snap_term);
+
+// Verifies the `.dat` file matches the checksum in the `.meta` file before allowing it to load
+int raft_wal_verify_snapshot_manifest(const char* base_dir, uint64_t group_id, uint64_t* out_idx, uint64_t* out_term);
+
 #endif // RAFT_WAL_H

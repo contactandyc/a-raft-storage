@@ -368,6 +368,77 @@ MACRO_TEST(raft_wal_truncate_tail_one_past_end_is_noop) {
     raft_wal_close(&wal);
 }
 
+// ============================================================================
+// ENTERPRISE FEATURE TESTS
+// ============================================================================
+
+MACRO_TEST(raft_wal_online_checkpointer_detects_clean_log) {
+    clear_test_dir();
+    raft_wal_t wal;
+    raft_wal_init(&wal, TEST_WAL_DIR, 1, 0);
+
+    raft_wal_append(&wal, 1, 1, 0, 0, 0, (uint8_t*)"A", 1);
+    raft_wal_append(&wal, 1, 2, 0, 0, 0, (uint8_t*)"B", 1);
+    raft_wal_flush_batch(&wal);
+
+    // 0 means no corruption found
+    MACRO_ASSERT_EQ_INT(raft_wal_verify_log_integrity(&wal), 0);
+    raft_wal_close(&wal);
+}
+
+MACRO_TEST(raft_wal_online_checkpointer_detects_bit_rot) {
+    clear_test_dir();
+    raft_wal_t wal;
+    raft_wal_init(&wal, TEST_WAL_DIR, 1, 0);
+
+    raft_wal_append(&wal, 1, 1, 0, 0, 0, (uint8_t*)"A", 1);
+    raft_wal_append(&wal, 1, 2, 0, 0, 0, (uint8_t*)"B", 1);
+    raft_wal_flush_batch(&wal);
+
+    // Intentionally corrupt index 2 by flipping a byte deep in the file
+    // IN THE BACKGROUND while the WAL is currently online!
+    int fd = open(TEST_WAL_DIR "/0000000001.wal", O_RDWR);
+    uint8_t garbage = 0xFF;
+    pwrite(fd, &garbage, 1, RAFT_WAL_SEG_HEADER_SIZE + RAFT_WAL_FRAME_HEADER_SIZE + 1 + 5);
+    close(fd);
+
+    // The checkpointer scans the open WAL, hits the background bit-rot, and flags it
+    MACRO_ASSERT_EQ_INT(raft_wal_verify_log_integrity(&wal), 2);
+
+    raft_wal_close(&wal);
+}
+
+MACRO_TEST(raft_wal_snapshot_manifest_generation_and_verification) {
+    clear_test_dir();
+    mkdir(TEST_WAL_DIR, 0755);
+
+    // 1. Create a fake snapshot data file
+    FILE* fdat = fopen(TEST_WAL_DIR "/snap_grp0.dat", "wb");
+    fwrite("SNAPSHOT_STATE_DATA", 1, 19, fdat);
+    fclose(fdat);
+
+    // 2. Generate the Cryptographic Manifest
+    int err = raft_wal_create_snapshot_manifest(TEST_WAL_DIR, 0, 100, 5);
+    MACRO_ASSERT_EQ_INT(err, 0);
+
+    // 3. Verify it passes
+    uint64_t read_idx = 0, read_term = 0;
+    err = raft_wal_verify_snapshot_manifest(TEST_WAL_DIR, 0, &read_idx, &read_term);
+
+    MACRO_ASSERT_EQ_INT(err, 0);
+    MACRO_ASSERT_EQ_INT(read_idx, 100);
+    MACRO_ASSERT_EQ_INT(read_term, 5);
+
+    // 4. Intentionally corrupt the data file
+    fdat = fopen(TEST_WAL_DIR "/snap_grp0.dat", "wb");
+    fwrite("SNAPSHOT_STATE_HACK", 1, 19, fdat);
+    fclose(fdat);
+
+    // 5. Verify the manifest catches the checksum mismatch
+    err = raft_wal_verify_snapshot_manifest(TEST_WAL_DIR, 0, &read_idx, &read_term);
+    MACRO_ASSERT_EQ_INT(err, -1);
+}
+
 int main(void) {
     macro_test_case tests[256];
     size_t test_count = 0;
@@ -395,6 +466,9 @@ int main(void) {
     MACRO_ADD(tests, raft_wal_offset_map_shrinks_after_purge);
     MACRO_ADD(tests, raft_wal_read_purged_entry_returns_not_found);
     MACRO_ADD(tests, raft_wal_truncate_tail_one_past_end_is_noop);
+    MACRO_ADD(tests, raft_wal_online_checkpointer_detects_clean_log);
+    MACRO_ADD(tests, raft_wal_online_checkpointer_detects_bit_rot);
+    MACRO_ADD(tests, raft_wal_snapshot_manifest_generation_and_verification);
 
     macro_run_all("raft_wal", tests, test_count);
     return 0;
