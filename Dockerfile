@@ -114,12 +114,36 @@ RUN set -eux; \
     ./build.sh install; \
     cd ..; \
     rm -rf "h2o-c-library"
+# --- Build & install a-raft-core ---
+RUN set -eux; \
+    git clone --depth 1 --single-branch "https://github.com/contactandyc/a-raft-core.git" "a-raft-core"; \
+    cd "a-raft-core"; \
+    ./build.sh clean && \
+    ./build.sh install; \
+    cd ..; \
+    rm -rf "a-raft-core"
+# --- Build & install a-raft-storage ---
+RUN set -eux; \
+    git clone --depth 1 --single-branch "https://github.com/contactandyc/a-raft-storage.git" "a-raft-storage"; \
+    cd "a-raft-storage"; \
+    ./build.sh clean && \
+    ./build.sh install; \
+    cd ..; \
+    rm -rf "a-raft-storage"
+# --- Build & install a-raft-transport ---
+RUN set -eux; \
+    git clone --depth 1 --single-branch "https://github.com/contactandyc/a-raft-transport.git" "a-raft-transport"; \
+    cd "a-raft-transport"; \
+    ./build.sh clean && \
+    ./build.sh install; \
+    cd ..; \
+    rm -rf "a-raft-transport"
 
 # --- Build & install this project --------------------------------------------
-COPY --chown=dev:dev . /workspace/a-raft-storage
-RUN mkdir -p /workspace/build/a-raft-storage && \
-    cd /workspace/build/a-raft-storage && \
-    cmake /workspace/a-raft-storage && \
+COPY --chown=dev:dev . /workspace/a-raft-node
+RUN mkdir -p /workspace/build/a-raft-node && \
+    cd /workspace/build/a-raft-node && \
+    cmake /workspace/a-raft-node && \
     make -j"$(nproc)" && sudo make install
 
 CMD ["/bin/bash"]

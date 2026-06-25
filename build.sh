@@ -174,8 +174,8 @@ case "$COMMAND" in
     cmake --build build -j >/dev/null 2>&1
 
     # 3. Compare the shared libraries
-    OLD_SO="$OLD_DIR/build/liba_raft_library_shared.so"
-    NEW_SO="build/liba_raft_library_shared.so"
+    OLD_SO="$OLD_DIR/build/liba_raft_node_shared.so"
+    NEW_SO="build/liba_raft_node_shared.so"
 
     # Temporarily disable 'set -e' because abidiff returns non-zero if it finds differences
     set +e
@@ -225,7 +225,7 @@ case "$COMMAND" in
     echo ""
     echo "--- Coverage summary (console) ---"
     # Compiled library: summarize from the built archive
-    llvm-cov report "$COV_BUILD_DIR/liba_raft_library_debug.a" \
+    llvm-cov report "$COV_BUILD_DIR/liba_raft_node_debug.a" \
       -instr-profile="$COV_BUILD_DIR/tests/default.profdata"
 
     echo ""

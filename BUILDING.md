@@ -1,7 +1,7 @@
 # BUILDING
 
-This project: **a-raft-storage**
-Version: **0.1.5**
+This project: **a-raft-node**
+Version: **0.1.4**
 
 ## Local build
 
@@ -144,5 +144,47 @@ cd "h2o-c-library"
 ./build.sh install
 cd ..
 rm -rf "h2o-c-library"
+```
+
+
+### a-raft-core
+
+Clone & build:
+
+```bash
+git clone --depth 1 --single-branch "https://github.com/contactandyc/a-raft-core.git" "a-raft-core"
+cd "a-raft-core"
+./build.sh clean
+./build.sh install
+cd ..
+rm -rf "a-raft-core"
+```
+
+
+### a-raft-storage
+
+Clone & build:
+
+```bash
+git clone --depth 1 --single-branch "https://github.com/contactandyc/a-raft-storage.git" "a-raft-storage"
+cd "a-raft-storage"
+./build.sh clean
+./build.sh install
+cd ..
+rm -rf "a-raft-storage"
+```
+
+
+### a-raft-transport
+
+Clone & build:
+
+```bash
+git clone --depth 1 --single-branch "https://github.com/contactandyc/a-raft-transport.git" "a-raft-transport"
+cd "a-raft-transport"
+./build.sh clean
+./build.sh install
+cd ..
+rm -rf "a-raft-transport"
 ```
 

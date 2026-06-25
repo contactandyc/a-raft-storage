@@ -1,5 +1,5 @@
-project_title: a-raft-storage
-version: "0.1.5"
+project_title: a-raft-node
+version: "0.1.4"
 description: "A dynamically scaffolded c/cmake project"
 stack: c/cmake
 date_created: 2026-04-26
@@ -24,5 +24,8 @@ cxx_standard: "17"
 depends_on:
   - common/libuv
   # - https://github.com/contactandyc/a-write-ahead-log.git
+  - https://github.com/contactandyc/a-raft-core.git
+  - https://github.com/contactandyc/a-raft-transport.git
+  - https://github.com/contactandyc/a-raft-storage.git
   - https://github.com/contactandyc/h2o-c-library.git
   - https://github.com/contactandyc/the-lz4-library.git

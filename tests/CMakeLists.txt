@@ -6,7 +6,7 @@
 # CMakeLists.txt for tests
 cmake_minimum_required(VERSION 3.20)
 
-project(a_raft_storage_tests LANGUAGES C)
+project(a_raft_node_tests LANGUAGES C)
 
 if(CMAKE_PREFIX_PATH)
   include_directories("${CMAKE_PREFIX_PATH}/include")
@@ -14,7 +14,7 @@ if(CMAKE_PREFIX_PATH)
 endif()
 
 set(A_BUILD_VARIANT "debug" CACHE STRING
-    "Variant to link via a_raft_storage::a_raft_storage (debug|memory|static|shared)")
+    "Variant to link via a_raft_node::a_raft_node (debug|memory|static|shared)")
 set_property(CACHE A_BUILD_VARIANT PROPERTY STRINGS debug memory static shared)
 
 option(A_ENABLE_COVERAGE "Enable code coverage instrumentation" OFF)
@@ -37,65 +37,228 @@ endif()
 find_library(M_LIB m)
 
 find_package(libuv CONFIG REQUIRED)
+find_package(a_raft_core CONFIG REQUIRED)
+find_package(a_raft_transport CONFIG REQUIRED)
+find_package(a_raft_storage CONFIG REQUIRED)
 find_package(h2o_c_library CONFIG REQUIRED)
 find_package(the_lz4_library CONFIG REQUIRED)
 
 # Fallback for standalone test builds (when not included via add_subdirectory)
-if(NOT TARGET a_raft_storage::a_raft_storage)
-  find_package(a_raft_storage CONFIG REQUIRED)
+if(NOT TARGET a_raft_node::a_raft_node)
+  find_package(a_raft_node CONFIG REQUIRED)
 endif()
 
 set(TEST_EXECUTABLES "")
 
 # ---- Targets ----
 # ==============================================================================
-# test_raft_wal Target (Standard Test)
+# test_raft_api Target (Standard Test)
 # ==============================================================================
-add_executable(test_raft_wal
-  src/test_raft_wal.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src/raft_wal.c
+add_executable(test_raft_api
+  src/test_raft_api.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/raft_io.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/raft_server.c
 )
 
-target_include_directories(test_raft_wal BEFORE PRIVATE
+target_include_directories(test_raft_api BEFORE PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/../src
   ${CMAKE_CURRENT_SOURCE_DIR}/../include
 )
 
-list(APPEND TEST_EXECUTABLES test_raft_wal)
+list(APPEND TEST_EXECUTABLES test_raft_api)
 
-set_target_properties(test_raft_wal PROPERTIES
+set_target_properties(test_raft_api PROPERTIES
   C_STANDARD 23
   C_STANDARD_REQUIRED YES
   CXX_STANDARD 17
   CXX_STANDARD_REQUIRED YES
 )
 
-target_link_libraries(test_raft_wal PRIVATE libuv::uv)
-target_link_libraries(test_raft_wal PRIVATE h2o_c_library::h2o_c_library)
-target_link_libraries(test_raft_wal PRIVATE the_lz4_library::the_lz4_library)
-target_link_libraries(test_raft_wal PRIVATE a_raft_storage::a_raft_storage)
+target_link_libraries(test_raft_api PRIVATE libuv::uv)
+target_link_libraries(test_raft_api PRIVATE a_raft_core::a_raft_core)
+target_link_libraries(test_raft_api PRIVATE a_raft_transport::a_raft_transport)
+target_link_libraries(test_raft_api PRIVATE a_raft_storage::a_raft_storage)
+target_link_libraries(test_raft_api PRIVATE h2o_c_library::h2o_c_library)
+target_link_libraries(test_raft_api PRIVATE the_lz4_library::the_lz4_library)
+target_link_libraries(test_raft_api PRIVATE a_raft_node::a_raft_node)
 
 if(M_LIB)
-  target_link_libraries(test_raft_wal PRIVATE ${M_LIB})
+  target_link_libraries(test_raft_api PRIVATE ${M_LIB})
 endif()
 
 if(MSVC)
-  target_compile_options(test_raft_wal PRIVATE /W4 ${TEST_COMPILER_OPTS})
+  target_compile_options(test_raft_api PRIVATE /W4 ${TEST_COMPILER_OPTS})
 else()
-  target_compile_options(test_raft_wal PRIVATE -Wall -Wextra -Wpedantic ${TEST_COMPILER_OPTS})
+  target_compile_options(test_raft_api PRIVATE -Wall -Wextra -Wpedantic ${TEST_COMPILER_OPTS})
 endif()
 
 if(A_ENABLE_COVERAGE)
   if (CMAKE_C_COMPILER_ID MATCHES "Clang")
-    target_compile_options(test_raft_wal PRIVATE -O0 -g -fprofile-instr-generate -fcoverage-mapping)
-    target_link_options(test_raft_wal PRIVATE -fprofile-instr-generate -fcoverage-mapping)
+    target_compile_options(test_raft_api PRIVATE -O0 -g -fprofile-instr-generate -fcoverage-mapping)
+    target_link_options(test_raft_api PRIVATE -fprofile-instr-generate -fcoverage-mapping)
   elseif (CMAKE_C_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(test_raft_wal PRIVATE -O0 -g --coverage)
-    target_link_options(test_raft_wal PRIVATE --coverage)
+    target_compile_options(test_raft_api PRIVATE -O0 -g --coverage)
+    target_link_options(test_raft_api PRIVATE --coverage)
   endif()
 endif()
 
-add_test(NAME test_raft_wal COMMAND $<TARGET_FILE:test_raft_wal>)
+add_test(NAME test_raft_api COMMAND $<TARGET_FILE:test_raft_api>)
+# ==============================================================================
+# test_raft_cluster Target (Standard Test)
+# ==============================================================================
+add_executable(test_raft_cluster
+  src/test_raft_cluster.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/raft_io.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/raft_server.c
+)
+
+target_include_directories(test_raft_cluster BEFORE PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../src
+  ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
+
+list(APPEND TEST_EXECUTABLES test_raft_cluster)
+
+set_target_properties(test_raft_cluster PROPERTIES
+  C_STANDARD 23
+  C_STANDARD_REQUIRED YES
+  CXX_STANDARD 17
+  CXX_STANDARD_REQUIRED YES
+)
+
+target_link_libraries(test_raft_cluster PRIVATE libuv::uv)
+target_link_libraries(test_raft_cluster PRIVATE a_raft_core::a_raft_core)
+target_link_libraries(test_raft_cluster PRIVATE a_raft_transport::a_raft_transport)
+target_link_libraries(test_raft_cluster PRIVATE a_raft_storage::a_raft_storage)
+target_link_libraries(test_raft_cluster PRIVATE h2o_c_library::h2o_c_library)
+target_link_libraries(test_raft_cluster PRIVATE the_lz4_library::the_lz4_library)
+target_link_libraries(test_raft_cluster PRIVATE a_raft_node::a_raft_node)
+
+if(M_LIB)
+  target_link_libraries(test_raft_cluster PRIVATE ${M_LIB})
+endif()
+
+if(MSVC)
+  target_compile_options(test_raft_cluster PRIVATE /W4 ${TEST_COMPILER_OPTS})
+else()
+  target_compile_options(test_raft_cluster PRIVATE -Wall -Wextra -Wpedantic ${TEST_COMPILER_OPTS})
+endif()
+
+if(A_ENABLE_COVERAGE)
+  if (CMAKE_C_COMPILER_ID MATCHES "Clang")
+    target_compile_options(test_raft_cluster PRIVATE -O0 -g -fprofile-instr-generate -fcoverage-mapping)
+    target_link_options(test_raft_cluster PRIVATE -fprofile-instr-generate -fcoverage-mapping)
+  elseif (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(test_raft_cluster PRIVATE -O0 -g --coverage)
+    target_link_options(test_raft_cluster PRIVATE --coverage)
+  endif()
+endif()
+
+add_test(NAME test_raft_cluster COMMAND $<TARGET_FILE:test_raft_cluster>)
+# ==============================================================================
+# test_raft_io Target (Standard Test)
+# ==============================================================================
+add_executable(test_raft_io
+  src/test_raft_io.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/raft_io.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/raft_server.c
+)
+
+target_include_directories(test_raft_io BEFORE PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../src
+  ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
+
+list(APPEND TEST_EXECUTABLES test_raft_io)
+
+set_target_properties(test_raft_io PROPERTIES
+  C_STANDARD 23
+  C_STANDARD_REQUIRED YES
+  CXX_STANDARD 17
+  CXX_STANDARD_REQUIRED YES
+)
+
+target_link_libraries(test_raft_io PRIVATE libuv::uv)
+target_link_libraries(test_raft_io PRIVATE a_raft_core::a_raft_core)
+target_link_libraries(test_raft_io PRIVATE a_raft_transport::a_raft_transport)
+target_link_libraries(test_raft_io PRIVATE a_raft_storage::a_raft_storage)
+target_link_libraries(test_raft_io PRIVATE h2o_c_library::h2o_c_library)
+target_link_libraries(test_raft_io PRIVATE the_lz4_library::the_lz4_library)
+target_link_libraries(test_raft_io PRIVATE a_raft_node::a_raft_node)
+
+if(M_LIB)
+  target_link_libraries(test_raft_io PRIVATE ${M_LIB})
+endif()
+
+if(MSVC)
+  target_compile_options(test_raft_io PRIVATE /W4 ${TEST_COMPILER_OPTS})
+else()
+  target_compile_options(test_raft_io PRIVATE -Wall -Wextra -Wpedantic ${TEST_COMPILER_OPTS})
+endif()
+
+if(A_ENABLE_COVERAGE)
+  if (CMAKE_C_COMPILER_ID MATCHES "Clang")
+    target_compile_options(test_raft_io PRIVATE -O0 -g -fprofile-instr-generate -fcoverage-mapping)
+    target_link_options(test_raft_io PRIVATE -fprofile-instr-generate -fcoverage-mapping)
+  elseif (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(test_raft_io PRIVATE -O0 -g --coverage)
+    target_link_options(test_raft_io PRIVATE --coverage)
+  endif()
+endif()
+
+add_test(NAME test_raft_io COMMAND $<TARGET_FILE:test_raft_io>)
+# ==============================================================================
+# test_raft_pump Target (Standard Test)
+# ==============================================================================
+add_executable(test_raft_pump
+  src/test_raft_pump.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/raft_io.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/raft_server.c
+)
+
+target_include_directories(test_raft_pump BEFORE PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../src
+  ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
+
+list(APPEND TEST_EXECUTABLES test_raft_pump)
+
+set_target_properties(test_raft_pump PROPERTIES
+  C_STANDARD 23
+  C_STANDARD_REQUIRED YES
+  CXX_STANDARD 17
+  CXX_STANDARD_REQUIRED YES
+)
+
+target_link_libraries(test_raft_pump PRIVATE libuv::uv)
+target_link_libraries(test_raft_pump PRIVATE a_raft_core::a_raft_core)
+target_link_libraries(test_raft_pump PRIVATE a_raft_transport::a_raft_transport)
+target_link_libraries(test_raft_pump PRIVATE a_raft_storage::a_raft_storage)
+target_link_libraries(test_raft_pump PRIVATE h2o_c_library::h2o_c_library)
+target_link_libraries(test_raft_pump PRIVATE the_lz4_library::the_lz4_library)
+target_link_libraries(test_raft_pump PRIVATE a_raft_node::a_raft_node)
+
+if(M_LIB)
+  target_link_libraries(test_raft_pump PRIVATE ${M_LIB})
+endif()
+
+if(MSVC)
+  target_compile_options(test_raft_pump PRIVATE /W4 ${TEST_COMPILER_OPTS})
+else()
+  target_compile_options(test_raft_pump PRIVATE -Wall -Wextra -Wpedantic ${TEST_COMPILER_OPTS})
+endif()
+
+if(A_ENABLE_COVERAGE)
+  if (CMAKE_C_COMPILER_ID MATCHES "Clang")
+    target_compile_options(test_raft_pump PRIVATE -O0 -g -fprofile-instr-generate -fcoverage-mapping)
+    target_link_options(test_raft_pump PRIVATE -fprofile-instr-generate -fcoverage-mapping)
+  elseif (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(test_raft_pump PRIVATE -O0 -g --coverage)
+    target_link_options(test_raft_pump PRIVATE --coverage)
+  endif()
+endif()
+
+add_test(NAME test_raft_pump COMMAND $<TARGET_FILE:test_raft_pump>)
 
 enable_testing()
 
@@ -127,7 +290,7 @@ if(A_ENABLE_COVERAGE AND CMAKE_C_COMPILER_ID MATCHES "Clang")
     # Normal compiled library path
     add_custom_command(TARGET coverage_report POST_BUILD
       COMMAND ${LLVM_COV_EXECUTABLE} show
-              ../liba_raft_storage_${A_BUILD_VARIANT}.a
+              ../liba_raft_node_${A_BUILD_VARIANT}.a
               -instr-profile=default.profdata
               -format=html -output-dir=coverage_html
               --ignore-filename-regex='/usr/.*'
